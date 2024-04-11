@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\User;
 use DateTimeImmutable;
+use DateTime;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Security\Authentication\Token\PreAuthenticationJWTUserToken;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWSProvider\JWSProviderInterface;
@@ -50,6 +51,7 @@ class UserController extends AbstractController
     $user->setCreateAt(new DateTimeImmutable());
     $user->setUpdateAt(new DateTimeImmutable());
     
+    
     // Générer le hachage du mot de passe
     $password = $data['password'] ?? ''; 
     $hash = $passwordHash->hashPassword($user, $password);
@@ -65,29 +67,53 @@ class UserController extends AbstractController
     ]);
 }
 
-    #[Route('/user', name: 'user_put', methods: 'PUT')]
-    public function update(Request $request): JsonResponse
+    #[Route('/user/{id}', name: 'user_post', methods: ['POST'])]
+    public function update(Request $request, UserPasswordHasherInterface $passwordHash, int $id): JsonResponse
     {
+    // Récupérer les données JSON du corps de la requête
+    $data = json_decode($request->getContent(), true);
 
-        $dataMiddellware = $this->tokenVerifier->checkToken($request);
-        if(gettype($dataMiddellware) == 'boolean'){
-            return $this->json($this->tokenVerifier->sendJsonErrorToken($dataMiddellware));
-        }
-        $user = $dataMiddellware;
+    // Récupérer l'utilisateur à mettre à jour depuis la base de données
+    $user = $this->entityManager->getRepository(User::class)->find($id);
 
-        dd($user);
-        $phone = "0668000000";
-        if(preg_match("/^[0-9]{10}$/", $phone)) {
-            $old = $user->getTel();
-            $user->setTel($phone);
-            $this->entityManager->flush();
-            return $this->json([
-                "New_tel" => $user->getTel(),
-                "Old_tel" => $old,
-                "user" => $user->serializer(),
-            ]);
-        }
+    // Vérifier si l'utilisateur existe
+    if (!$user) {
+        throw $this->createNotFoundException('Utilisateur non trouvé');
     }
+
+    // Mettre à jour les propriétés de l'utilisateur avec les nouvelles données
+    $user->setName($data['name'] ?? $user->getName()); 
+    $user->setEmail($data['email'] ?? $user->getEmail()); 
+    $user->setTel($data['tel'] ?? $user->getTel()); 
+    $user->setSexe($data['sexe'] ?? $user->getSexe()); 
+
+    // Convertir la date de naissance en objet DateTime
+    $dateOfBirthString = $data['date_birth'] ?? ''; 
+    if (!empty($dateOfBirthString)) {
+        $dateOfBirth = new DateTime($dateOfBirthString);
+        $user->setDateBirth($dateOfBirth);
+    }
+
+    // Mettre à jour la date de mise à jour
+    $user->setUpdateAt(new DateTimeImmutable());
+    
+    // Si un nouveau mot de passe est fourni, le mettre à jour
+    $password = $data['password'] ?? '';
+    if (!empty($password)) {
+        $hash = $passwordHash->hashPassword($user, $password);
+        $user->setPassword($hash);
+    }
+
+    // Enregistrer les modifications dans la base de données
+    $this->entityManager->flush();
+
+    return $this->json([
+        'user' => $user->serializer(),
+        'path' => 'src/Controller/UserController.php',
+    ]);
+}
+
+
 
     #[Route('/user', name: 'user_delete', methods: 'DELETE')]
     public function delete(): JsonResponse

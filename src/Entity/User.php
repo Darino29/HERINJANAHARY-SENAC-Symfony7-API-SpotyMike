@@ -2,11 +2,12 @@
 
 namespace App\Entity;
 
+use App\Repository\UserRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
-use App\Repository\UserRepository;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
+
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
@@ -17,13 +18,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?int $id = null;
 
     // #[ORM\Id]
-    #[ORM\Column(length: 90, unique:true)]
+    #[ORM\Column(length: 90)]
     private ?string $idUser = null;
 
     #[ORM\Column(length: 55)]
     private ?string $name = null;
 
-    #[ORM\Column(length: 80, unique:true)]
+    #[ORM\Column(length: 80,unique:true) ]
     private ?string $email = null;
 
     #[ORM\Column(length: 90)]
@@ -31,6 +32,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(length: 15, nullable: true)]
     private ?string $tel = null;
+
+    #[ORM\Column(length: 15, nullable: true)]
+    private ?string $sexe = null;
+
+    #[ORM\Column(type: "date", nullable: true)]
+    private ?\DateTimeInterface $dateBirth = null;
 
     #[ORM\Column]
     private ?\DateTimeImmutable $createAt = null;
@@ -70,11 +77,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function getUsername(): ?string
-    {
-        return $this->email;
-    }
-
     public function getEmail(): ?string
     {
         return $this->email;
@@ -110,6 +112,32 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
         return $this;
     }
+
+    public function getSexe(): ? string
+    {
+        return $this->sexe;
+    }
+
+    public function setSexe(?string $sexe): static
+    {
+        $this->sexe = $sexe;
+
+        return $this;
+    }
+
+    public function getDateBirth(): ?\DateTimeInterface
+    {
+        return $this->dateBirth;
+    }
+
+    public function setDateBirth(\DateTimeInterface $dateBirth): static
+    {
+        $this->dateBirth = $dateBirth;
+
+        return $this;
+    }
+
+
 
     public function getCreateAt(): ?\DateTimeImmutable
     {
@@ -162,19 +190,20 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     public function getUserIdentifier(): string{
-        return $this->getEmail();
+        return "";
     }
 
     public function serializer()
     {
         return [
-            "id" => $this->getId(),
-            "idUser" => $this->getIdUser(),
-            "name" => $this->getName(),
-            "email" => $this->getEmail(),
-            "tel" => $this->getTel(),
-            "createAt" => $this->getCreateAt(),
-            "artist" => $this->getArtist() ?  $this->getArtist()->serializer() : [],
+            'id' => $this->getId(),
+            'idUser' => $this->getIdUser(),
+            'name' => $this->getName(),
+            'email' => $this->getEmail(),
+            'tel' => $this->getTel(),
+            'sexe' => $this->getSexe(),
+            'dateBirth' => $this->getDateBirth(),
+            'artist' => $this->getArtist() ? $this->getArtist()->serializer() : [],
         ];
     }
 }
