@@ -2,12 +2,14 @@
 
 namespace App\Entity;
 
-use App\Repository\UserRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use App\Repository\UserRepository;
+use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
+use Symfony\Component\Security\Core\User\UserInterface;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
-class User
+class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -15,13 +17,13 @@ class User
     private ?int $id = null;
 
     // #[ORM\Id]
-    #[ORM\Column(length: 90)]
+    #[ORM\Column(length: 90, unique:true)]
     private ?string $idUser = null;
 
     #[ORM\Column(length: 55)]
     private ?string $name = null;
 
-    #[ORM\Column(length: 80)]
+    #[ORM\Column(length: 80, unique:true)]
     private ?string $email = null;
 
     #[ORM\Column(length: 90)]
@@ -68,6 +70,11 @@ class User
         return $this;
     }
 
+    public function getUsername(): ?string
+    {
+        return $this->email;
+    }
+
     public function getEmail(): ?string
     {
         return $this->email;
@@ -80,12 +87,12 @@ class User
         return $this;
     }
 
-    public function getEncrypte(): ?string
+    public function getPassword(): ?string
     {
         return $this->encrypte;
     }
 
-    public function setEncrypte(string $encrypte): static
+    public function setPassword(string $encrypte): static
     {
         $this->encrypte = $encrypte;
 
@@ -143,5 +150,31 @@ class User
         $this->artist = $artist;
 
         return $this;
+    }
+
+    public function getRoles(): array{
+
+        return ['PUBLIC_ACCESS'];
+    }
+
+    public function eraseCredentials(): void{
+
+    }
+
+    public function getUserIdentifier(): string{
+        return $this->getEmail();
+    }
+
+    public function serializer()
+    {
+        return [
+            "id" => $this->getId(),
+            "idUser" => $this->getIdUser(),
+            "name" => $this->getName(),
+            "email" => $this->getEmail(),
+            "tel" => $this->getTel(),
+            "createAt" => $this->getCreateAt(),
+            "artist" => $this->getArtist() ?  $this->getArtist()->serializer() : [],
+        ];
     }
 }
