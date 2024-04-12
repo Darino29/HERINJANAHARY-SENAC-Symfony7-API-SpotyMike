@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\User;
 use DateTimeImmutable;
 use DateTime;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Security\Authentication\Token\PreAuthenticationJWTUserToken;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWSProvider\JWSProviderInterface;
@@ -67,51 +68,7 @@ class UserController extends AbstractController
     ]);
 }
 
-    #[Route('/user/{id}', name: 'user_post', methods: ['POST'])]
-    public function update(Request $request, UserPasswordHasherInterface $passwordHash, int $id): JsonResponse
-    {
-    // Récupérer les données JSON du corps de la requête
-    $data = json_decode($request->getContent(), true);
-
-    // Récupérer l'utilisateur à mettre à jour depuis la base de données
-    $user = $this->entityManager->getRepository(User::class)->find($id);
-
-    // Vérifier si l'utilisateur existe
-    if (!$user) {
-        throw $this->createNotFoundException('Utilisateur non trouvé');
-    }
-
-    // Mettre à jour les propriétés de l'utilisateur avec les nouvelles données
-    $user->setName($data['name'] ?? $user->getName()); 
-    $user->setEmail($data['email'] ?? $user->getEmail()); 
-    $user->setTel($data['tel'] ?? $user->getTel()); 
-    $user->setSexe($data['sexe'] ?? $user->getSexe()); 
-
-    // Convertir la date de naissance en objet DateTime
-    $dateOfBirthString = $data['date_birth'] ?? ''; 
-    if (!empty($dateOfBirthString)) {
-        $dateOfBirth = new DateTime($dateOfBirthString);
-        $user->setDateBirth($dateOfBirth);
-    }
-
-    // Mettre à jour la date de mise à jour
-    $user->setUpdateAt(new DateTimeImmutable());
-    
-    // Si un nouveau mot de passe est fourni, le mettre à jour
-    $password = $data['password'] ?? '';
-    if (!empty($password)) {
-        $hash = $passwordHash->hashPassword($user, $password);
-        $user->setPassword($hash);
-    }
-
-    // Enregistrer les modifications dans la base de données
-    $this->entityManager->flush();
-
-    return $this->json([
-        'user' => $user->serializer(),
-        'path' => 'src/Controller/UserController.php',
-    ]);
-}
+   
 
 
 
@@ -125,6 +82,88 @@ class UserController extends AbstractController
             'path' => 'src/Controller/UserController.php',
         ]);
     }
+
+
+    #[Route('/user', name: 'update_user_profile', methods: ['POST'])]
+public function updateUserProfile(Request $request, EntityManagerInterface $entityManager, ValidatorInterface $validator, JWTTokenManagerInterface $JWTManager): JsonResponse
+{
+    // Récupérer les données JSON du corps de la requête
+    $data = json_decode($request->getContent(), true);
+    
+    // Récupérer le token JWT depuis les en-têtes de la requête
+    $token = $request->headers->get('Authorization');
+
+    // Vérifier si le token est présent et valide
+    if (!$token) {
+        return $this->json(['error' => true, 'message' => 'Non authentifié'], 401);
+    }
+
+    // Extraire le JWT du format 'Bearer xxxx'
+    $jwt = str_replace('Bearer ', '', $token);
+
+    // Vérifier si le token est valide et récupérer l'utilisateur associé
+    try {
+        $user = $JWTManager->parse($jwt)->getUser();
+    } catch (JWTDecodeFailureException $e) {
+        return $this->json(['error' => true, 'message' => 'Token invalide'], 401);
+    }
+
+    // Vérifier si l'utilisateur existe
+    if (!$user) {
+        return $this->json(['error' => true, 'message' => 'Utilisateur introuvable'], 404);
+    }
+
+    // Mettre à jour les informations de l'utilisateur
+    if (isset($data['name'])) {
+        $user->setName($data['name']);
+    }
+    if (isset($data['tel'])) {
+        // Valider le format du numéro de téléphone
+        if (!preg_match('/^\d{10}$/', $data['tel'])) {
+            return $this->json(['error' => true, 'message' => 'Format de numéro de téléphone invalide'], 400);
+        }
+        // Vérifier si le numéro de téléphone est déjà utilisé par un autre utilisateur
+        $existingUser = $entityManager->getRepository(User::class)->findOneBy(['tel' => $data['tel']]);
+        if ($existingUser && $existingUser->getId() !== $user->getId()) {
+            return $this->json(['error' => true, 'message' => 'Numéro de téléphone déjà utilisé par un autre utilisateur'], 409);
+        }
+        $user->setTel($data['tel']);
+    }
+    if (isset($data['sexe'])) {
+        // Vérifier si la valeur de sexe est valide
+        if (!in_array($data['sexe'], ['0', '1'])) {
+            return $this->json(['error' => true, 'message' => 'Valeur de sexe invalide'], 400);
+        }
+        $user->setSexe($data['sexe']);
+    }
+    // Ajoutez d'autres mises à jour pour les autres champs de l'utilisateur
+
+    // Valider les modifications avec le Validator
+    $errors = $validator->validate($user);
+
+    // Si des erreurs de validation sont présentes
+    if (count($errors) > 0) {
+        $errorMessages = [];
+        foreach ($errors as $error) {
+            $errorMessages[$error->getPropertyPath()] = $error->getMessage();
+        }
+        return $this->json([
+            'error' => true,
+            'message' => 'Erreur de validation de donnée',
+            'details' => $errorMessages,
+        ], 400);
+    }
+
+    // Enregistrer les modifications dans la base de données
+    $entityManager->flush();
+
+    // Réponse de succès avec le profil mis à jour
+    return $this->json([
+        'error' => false,
+        'message' => 'Profil mis à jour avec succès',
+        'user' => $user->serializer(), // Serializer le nouvel objet utilisateur
+    ]);
+}
 
     #[Route('/user', name: 'user_get', methods: 'GET')]
     public function read(): JsonResponse
