@@ -47,26 +47,85 @@ class LoginController extends AbstractController
         // Créer un nouvel utilisateur avec les données fournies
         $user = new User();
         $user->setName($data['name']); 
-        $user->setEmail($data['email']); 
+
+        
+        $email = $data['email'];
+
+        if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            if ($userRepository->findOneByEmail($email) === null) {
+                $user->setEmail($email);
+            } 
+            else{
+                return $this->json([
+                    'error' => true,
+                    'message' => "Cet e-mail est déjà utilisé par un autre compte.",
+                    ], 400);
+                }
+        } else { return $this->json([
+            'error' => true,
+            'message' => "Le format de l'email est invalide",
+        ], 400);
+        }
+
+
+        
         $user->setIdUser($data['idUser'] ?? uniqid()); 
 
         // Vérifier si le sexe est fourni
         if (isset($data['sexe'])) {
-            $user->setSexe($data['sexe']);
-        }
+            $sexe = $data['sexe'];
 
-        // Vérifier si le numéro de téléphone est fourni
+            if ($sexe === '0' || $sexe === '1') {
+                $user->setSexe($sexe);
+            } else {
+                return $this->json([
+                    'error' => true,
+                    'message' => "La valeur du champ sexe est invalide. Les valeurs autorisées sont de 0 pour Femme, 1 pour Homme.",
+                ], 400);
+            }
+        }
+        
+
+       
         if (isset($data['tel'])) {
-            $user->setTel($data['tel']);
+            $tel = $data['tel'];
+            // Vérification du format du numéro de téléphone (format français)
+            if (preg_match('/^0[1-9]([-. ]?[0-9]{2}){4}$/', $tel)) {
+                $user->setTel($tel);
+            } else {
+                return $this->json([
+                    'error' => true,
+                    'message' => "Le format du numéro de téléphone est invalide.",
+                ], 400);
+            }
         }
+        
+        $dateOfBirthString = $data['date_birth'];
 
-        // Convertir la date de naissance en objet DateTime
-        $dateOfBirthString = $data['date_birth']; 
-        $dateOfBirth = new DateTime($dateOfBirthString);
-        $user->setDateBirth($dateOfBirth);  
+if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $dateOfBirthString)) {
+    $dateOfBirth = DateTime::createFromFormat('d/m/Y', $dateOfBirthString);
+    $now = new DateTime();
+    
+    // Vérifier si la personne a moins de 12 ans
+    $age = $now->diff($dateOfBirth)->y;
+    if ($age < 12) {
+        return $this->json([
+            'error' => true,
+            'message' => "L'utilisateur doit avoir au moins 12 ans",
+        ], 400);
+    }
 
-        $user->setCreateAt(new DateTimeImmutable());
-        $user->setUpdateAt(new DateTimeImmutable());
+    $user->setDateBirth($dateOfBirth);  
+    $user->setCreateAt(new DateTimeImmutable());
+    $user->setUpdateAt(new DateTimeImmutable());
+} else {
+    return $this->json([
+        'error' => true,
+        'message' => "Le format de la date de naissance est invalide. Le format attendu est JJ/MM/AAAA.",
+    ], 400); 
+}
+
+        
         
         // Valider l'utilisateur avec le Validator
         $errors = $validator->validate($user);
@@ -93,7 +152,7 @@ class LoginController extends AbstractController
             ], 400);
         }
 
-        // Vérifier si le champ email est vide
+        
         if (empty($data['email'])) {
             return $this->json([
                 'error' => true,
@@ -109,11 +168,20 @@ class LoginController extends AbstractController
                 'message' => 'Email déjà utilisé',
             ], 400);
         }
-        
+        $password = $data['password'];
+          if (preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}$/', $password)) {
+            $password = $data['password'] ?? ''; 
+            $hash = $this->passwordHasher->hashPassword($user, $password);
+            $user->setPassword($hash);
+          }
+          else {
+            return $this->json([
+                'error' => true,
+                'message' => 'Le mot de passe doit contenir au moins une majuscule, une minuscule, un chiffre, un caractère spécial et avoir 8 caractères minimum.',
+            ], 400);
+          }
         // Générer le hachage du mot de passe
-        $password = $data['password'] ?? ''; 
-        $hash = $this->passwordHasher->hashPassword($user, $password);
-        $user->setPassword($hash);
+        
         
         // Enregistrer l'utilisateur dans la base de données
         $this->entityManager->persist($user);
@@ -122,7 +190,7 @@ class LoginController extends AbstractController
         // Réponse de succès
         return $this->json([
             'error' => false,
-            'message' => 'Enregistrement réussi',
+            'message' => 'L\'utilisateur a bien été créé avec succès',
             'user' => $user->serializer(),
         ], 201);
     }

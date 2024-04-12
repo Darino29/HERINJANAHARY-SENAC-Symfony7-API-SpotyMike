@@ -33,7 +33,7 @@ class TokenVerifierService {
                 try {
                     $dataToken = $this->jwtProvider->load($token);
                     if($dataToken->isVerified($token)){
-                        $user = $this->userRepository->findOneBy(["email" => $dataToken->getPayload()["username"]]);
+                        $user = $this->userRepository->findOneBy(["username" => $dataToken->getPayload()["username"]]);
                         return ($user) ? $user : false;
                     }
                 } catch (\Throwable $th) {
