@@ -44,31 +44,32 @@ class LoginController extends AbstractController
             }
         }
 
-        // Créer un nouvel utilisateur avec les données fournies
+       
         $user = new User();
         $user->setName($data['name']); 
 
-        
         $email = $data['email'];
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return $this->json([
+                'error' => true,
+                'message' => "Le format de l'email est invalide",
+            ], 400);
+        }
+        else{
 
-        if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            if ($userRepository->findOneByEmail($email) === null) {
-                $user->setEmail($email);
-            } 
-            else{
+            $existingUser = $this->entityManager->getRepository(User::class)->findOneBy(['email' => $email]);
+            if ($existingUser) {
                 return $this->json([
                     'error' => true,
                     'message' => "Cet e-mail est déjà utilisé par un autre compte.",
-                    ], 400);
-                }
-        } else { return $this->json([
-            'error' => true,
-            'message' => "Le format de l'email est invalide",
-        ], 400);
+                ], 400);
+            }
+        else{$user->setEmail($email);}
+
         }
 
-
         
+
         $user->setIdUser($data['idUser'] ?? uniqid()); 
 
         // Vérifier si le sexe est fourni
