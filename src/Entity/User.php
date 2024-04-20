@@ -37,7 +37,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $sexe = null;
 
     #[ORM\Column(type: "date", nullable: true)]
-    private ?\DateTimeInterface $dateBirth = null;
+    private ?string $dateBirth = null;
 
     #[ORM\Column]
     private ?\DateTimeImmutable $createAt = null;
@@ -47,6 +47,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\OneToOne(mappedBy: 'User_idUser', cascade: ['persist', 'remove'])]
     private ?Artist $artist = null;
+
+    #[ORM\Column(type:"integer")]
+    private $loginAttempts;
+
+    #[ORM\Column(type: Types::DATETIME_MUTABLE)]
+    private $lastLoginAttempt;
+
 
     public function getId(): ?int
     {
@@ -130,9 +137,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->dateBirth;
     }
 
-    public function setDateBirth(\DateTimeInterface $dateBirth): static
+    public function setDateBirth(?string $dateBirth): static
     {
-        $this->dateBirth = $dateBirth;
+        $this->dateBirth = substr($dateBirth,0,10);
 
         return $this;
     }
@@ -180,6 +187,31 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    public function getLoginAttempts(): ?int
+    {
+        return $this->loginAttempts;
+    }
+
+    public function setLoginAttempts(int $loginAttempts): self
+    {
+        $this->loginAttempts = $loginAttempts;
+
+        return $this;
+    }
+
+    public function getLastLoginAttempt(): ?\DateTimeInterface
+    {
+        return $this->lastLoginAttempt;
+    }
+
+    public function setLastLoginAttempt(?\DateTimeInterface $lastLoginAttempt): self
+    {
+        $this->lastLoginAttempt = $lastLoginAttempt;
+
+        return $this;
+    }
+
+
     public function getRoles(): array{
 
         return ['PUBLIC_ACCESS'];
@@ -190,7 +222,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     public function getUserIdentifier(): string{
-        return "";
+        return $this->getEmail();
+   
+
     }
 
     public function serializer()
