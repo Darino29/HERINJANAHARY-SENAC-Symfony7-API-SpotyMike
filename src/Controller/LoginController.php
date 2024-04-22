@@ -183,8 +183,15 @@ if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $dateOfBirthString)) {
     
     
         $user = $this->repository->findOneBy(["email" => $email]);
+        
+        $currentTime = new DateTimeImmutable();
+        $timer5min = $currentTime->modify('-5 minutes');
     
-    
+        if ($user->getLoginAttempts() >= 5 && $user->getLastLoginAttempt() >= $timer5min) {
+            $timeLeft = $timer5min->diff($user->getLastLoginAttempt())->format('%i');
+            return $this->json(['error' => true, 'message' => 'Trop de tentatives de connexion (5 max). Veuillez réessayer ultérieurement - '.$timeLeft.' min d\'attente'], 429);
+        } 
+
         if (!$user) {
             return $this->json(['message' => 'Identifiants invalides'], 401);
         }
