@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Repository\UserRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
@@ -49,10 +50,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?Artist $artist = null;
 
     #[ORM\Column(type: "integer")]
-    private $loginAttempts;
+    private ?int $loginAttempts= null;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
-    private $lastLoginAttempt;
+    private ?int $lastLoginAttempt= null;
 
 
     public function getId(): ?int
