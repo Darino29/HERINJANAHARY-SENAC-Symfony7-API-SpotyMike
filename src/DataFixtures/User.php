@@ -15,7 +15,8 @@ class User extends Fixture
         for ($i=0; $i < 6; $i++) { 
            
             $user = new EntityUser();
-            $user->setName("User_".rand(0,999));
+            $user->setFirstname("User_".rand(0,999));
+            $user->setLastname("User_".rand(0,999));
             $user->setEmail("User_".rand(0,999));
             $user->setIdUser("User_".rand(0,999));
             $user->setCreateAt(new DateTimeImmutable());

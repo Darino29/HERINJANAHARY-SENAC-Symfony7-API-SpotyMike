@@ -28,26 +28,31 @@ class LoginController extends AbstractController
         $this->passwordHasher = $passwordHasher;
     }
 
-    #[Route('/register', name: 'login_post', methods: 'POST')]
+    #[Route('/register', name: 'register_post', methods: ['POST'])]
     public function create(Request $request, ValidatorInterface $validator): JsonResponse
     {
         // Récupérer les données JSON du corps de la requête
-        $data = json_decode($request->getContent(), true);
-
-        $requiredAttributes = ['name', 'email', 'dateBirth', 'password'];
+        $data = $request->request->all();
+        // Vérifier si des champs obligatoires sont manquants
+        $requiredAttributes = ['firstname', 'lastname','email', 'dateBirth', 'password'];
         foreach ($requiredAttributes as $attribute) {
-            if (!isset($data[$attribute]) || empty($data[$attribute])) {
+            $test = $request->get($attribute);
+            if (!isset($test) || empty($test)) {
                 return $this->json([
                     'error' => true,
                     'message' => "Des champs obligatoires sont manquants.",
                 ], 400);
             }
+            
         }
-
-       
+    
+        // Créer un nouvel utilisateur
         $user = new User();
-        $user->setName($data['name']); 
-
+        $user->setFirstname($data['firstname']); 
+        $user->setLastname($data['lastname']);
+    
+        dump($data);
+        // Valider l'adresse email
         $email = $data['email'];
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return $this->json([
@@ -55,25 +60,23 @@ class LoginController extends AbstractController
                 'message' => "Le format de l'email est invalide",
             ], 400);
         }
-        else{
-
-            $existingUser = $this->entityManager->getRepository(User::class)->findOneBy(['email' => $email]);
-            if ($existingUser) {
-                return $this->json([
-                    'error' => true,
-                    'message' => "Cet e-mail est déjà utilisé par un autre compte.",
-                ], 400);
-            }
-        else{$user->setEmail($email);}
-
+    
+        // Vérifier si l'email est déjà utilisé
+        $existingUser = $this->entityManager->getRepository(User::class)->findOneBy(['email' => $email]);
+        if ($existingUser) {
+            return $this->json([
+                'error' => true,
+                'message' => "Cet e-mail est déjà utilisé par un autre compte.",
+            ], 400);
         }
-
-        $user->setIdUser($data['idUser'] ?? uniqid()); 
-
-        // Vérifier si le sexe est fourni
+        $user->setEmail($email);
+    
+        // Générer un identifiant utilisateur unique
+        $user->setIdUser($data['idUser'] ?? uniqid());
+    
+        // Vérifier et définir le sexe si fourni
         if (isset($data['sexe'])) {
             $sexe = $data['sexe'];
-
             if ($sexe === '0' || $sexe === '1') {
                 $user->setSexe($sexe);
             } else {
@@ -83,7 +86,8 @@ class LoginController extends AbstractController
                 ], 400);
             }
         }
-        
+    
+        // Vérifier et définir le numéro de téléphone si fourni
         if (isset($data['tel'])) {
             $tel = $data['tel'];
             // Vérification du format du numéro de téléphone (format français)
@@ -96,59 +100,66 @@ class LoginController extends AbstractController
                 ], 400);
             }
         }
-        
-        $dateOfBirthString = $data['dateBirth'];
-
-if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $dateOfBirthString)) {
-    $dateOfBirth = DateTime::createFromFormat('d/m/Y', $dateOfBirthString);
-    $now = new DateTime();
     
-    // Vérifier si la personne a moins de 12 ans
-    $age = $now->diff($dateOfBirth)->y;
-    if ($age < 12) {
-        return $this->json([
-            'error' => true,
-            'message' => "L'utilisateur doit avoir au moins 12 ans",
-        ], 400);
-    }
+        // Vérifier et définir la date de naissance
+        $dateOfBirthString = $data['dateBirth'];
+        if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $dateOfBirthString)) {
+            // Convertir la date de naissance au format 'Y-m-d' (AAAA-MM-JJ) attendu par Doctrine
+            $dateOfBirth = DateTime::createFromFormat('d/m/Y', $dateOfBirthString);
+            if ($dateOfBirth === false) {
+                return $this->json([
+                    'error' => true,
+                    'message' => "La date de naissance n'est pas valide.",
+                ], 400);
+            }
+            $dateOfBirthFormatted = $dateOfBirth->format('Y-m-d');
 
-    $user->setDateBirth($dateOfBirth);  
-    $user->setCreateAt(new DateTimeImmutable());
-    $user->setUpdateAt(new DateTimeImmutable());
-} else {
-    return $this->json([
-        'error' => true,
-        'message' => "Le format de la date de naissance est invalide. Le format attendu est JJ/MM/AAAA.",
-    ], 400); 
-}
+            // Vérifier si la personne a moins de 12 ans
+            $now = new DateTime();
+            $age = $now->diff($dateOfBirth)->y;
+            if ($age < 12) {
+                return $this->json([
+                    'error' => true,
+                    'message' => "L'utilisateur doit avoir au moins 12 ans",
+                ], 400);
+            }
 
-        
-        $password = $data['password'];
-          if (preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}$/', $password)) {
-            $password = $data['password'] ?? ''; 
-            $hash = $this->passwordHasher->hashPassword($user, $password);
-            $user->setPassword($hash);
-          }
-          else {
+            // Définir la date de naissance, la date de création et la date de mise à jour de l'utilisateur
+            $user->setDateBirth(new DateTime($dateOfBirthFormatted));
+            $user->setCreateAt(new DateTimeImmutable());
+            $user->setUpdateAt(new DateTimeImmutable());
+        } else {
             return $this->json([
                 'error' => true,
-                'message' => 'Le mot de passe doit contenir au moins une majuscule, une minuscule, un chiffre, un caractère spécial et avoir 8 caractères minimum.',
-            ], 400);
-          }
-        // Générer le hachage du mot de passe
-        
-        
-        // Enregistrer l'utilisateur dans la base de données
-        $this->entityManager->persist($user);
-        $this->entityManager->flush();
+                'message' => "Le format de la date de naissance est invalide. Le format attendu est JJ/MM/AAAA.",
+            ], 400); 
+        }
 
-        // Réponse de succès
-        return $this->json([
-            'error' => false,
-            'message' => 'L\'utilisateur a bien été créé avec succès',
-            'user' => $user->serializer(),
-        ], 201);
-    }
+            
+                // Vérifier et définir le mot de passe
+                $password = $data['password'];
+                if (preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9]).{8,}$/', $password)) {
+                    $hash = $this->passwordHasher->hashPassword($user, $password);
+                    $user->setPassword($hash);
+                } else {
+                    return $this->json([
+                        'error' => true,
+                        'message' => 'Le mot de passe doit contenir au moins une majuscule, une minuscule, un chiffre, un caractère spécial et avoir 8 caractères minimum.',
+                    ], 400);
+                }
+            
+                // Enregistrer l'utilisateur dans la base de données
+                $this->entityManager->persist($user);
+                $this->entityManager->flush();
+            
+                // Réponse de succès
+                return $this->json([
+                    'error' => false,
+                    'message' => 'L\'utilisateur a bien été créé avec succès',
+                    'user' => $user->serializer(),
+                ], 201);
+            }
+            
     
     #[Route('/login', name: 'app_login_post', methods: ['POST'])]
     public function login(Request $request, JWTTokenManagerInterface $JWTManager, EntityManagerInterface $entityManager): JsonResponse    

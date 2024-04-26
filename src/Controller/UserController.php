@@ -7,12 +7,8 @@ use DateTimeImmutable;
 use DateTime;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Doctrine\ORM\EntityManagerInterface;
-use Lexik\Bundle\JWTAuthenticationBundle\Security\Authentication\Token\PreAuthenticationJWTUserToken;
-use Lexik\Bundle\JWTAuthenticationBundle\Services\JWSProvider\JWSProviderInterface;
-use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
-use Symfony\Component\Serializer\Serializer;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Serializer\Normalizer\ObjectNormalizer;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -21,52 +17,51 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 class UserController extends AbstractController
 {
     private $repository;
-    private $tokenVerifier;
     private $entityManager;
 
-    public function __construct(EntityManagerInterface $entityManager, TokenVerifierService $tokenVerifier){
+    public function __construct(EntityManagerInterface $entityManager)
+    {
         $this->entityManager = $entityManager;
-        $this->tokenVerifier = $tokenVerifier;
         $this->repository = $entityManager->getRepository(User::class);
     }
 
     #[Route('/user', name: 'user_post', methods: 'POST')]
     public function create(Request $request, UserPasswordHasherInterface $passwordHash): JsonResponse
     {
-    // Récupérer les données JSON du corps de la requête
-    $data = json_decode($request->getContent(), true);
+        // Récupérer les données JSON du corps de la requête
+        $data = json_decode($request->getContent(), true);
 
-    // Créer un nouvel utilisateur avec les données fournies
-    $user = new User();
-    $user->setName($data['name'] ?? ''); 
-    $user->setEmail($data['email'] ?? ''); 
-    $user->setIdUser($data['idUser'] ?? ''); 
-    $user->setTel($data['tel'] ?? ''); 
-    $user->setSexe($data['sexe'] ?? ''); 
+        // Créer un nouvel utilisateur avec les données fournies
+        $user = new User();
+        $user->setFirstname($data['firstname'] ?? '');
+        $user->setLastname($data['lastname'] ?? '');
+        $user->setEmail($data['email'] ?? '');
+        $user->setIdUser($data['idUser'] ?? '');
+        $user->setTel($data['tel'] ?? '');
+        $user->setSexe($data['sexe'] ?? '');
 
-    // Convertir la date de naissance en objet DateTime
-    $dateOfBirthString = $data['date_birth'] ?? ''; 
-    $dateOfBirth = new DateTime($dateOfBirthString);
-    $user->setDateBirth($dateOfBirth); 
+        // Convertir la date de naissance en objet DateTime
+        $dateOfBirthString = $data['date_birth'] ?? '';
+        $dateOfBirth = new DateTime($dateOfBirthString);
+        $user->setDateBirth($dateOfBirth);
 
-    $user->setCreateAt(new DateTimeImmutable());
-    $user->setUpdateAt(new DateTimeImmutable());
-    
-    
-    // Générer le hachage du mot de passe
-    $password = $data['password'] ?? ''; 
-    $hash = $passwordHash->hashPassword($user, $password);
-    $user->setPassword($hash);
+        $user->setCreateAt(new DateTimeImmutable());
+        $user->setUpdateAt(new DateTimeImmutable());
 
-    // Enregistrer l'utilisateur dans la base de données
-    $this->entityManager->persist($user);
-    $this->entityManager->flush();
+        // Générer le hachage du mot de passe
+        $password = $data['password'] ?? '';
+        $hash = $passwordHash->hashPassword($user, $password);
+        $user->setPassword($hash);
 
-    return $this->json([
-        'user' => $user->serializer(),
-        'path' => 'src/Controller/UserController.php',
-    ]);
-}
+        // Enregistrer l'utilisateur dans la base de données
+        $this->entityManager->persist($user);
+        $this->entityManager->flush();
+
+        return $this->json([
+            'user' => $user->serializer(),
+            'path' => 'src/Controller/UserController.php',
+        ]);
+    }
 
    
 

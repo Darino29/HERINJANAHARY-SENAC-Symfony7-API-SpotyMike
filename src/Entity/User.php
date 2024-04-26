@@ -8,7 +8,6 @@ use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 
-
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
@@ -17,14 +16,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column]
     private ?int $id = null;
 
-    // #[ORM\Id]
     #[ORM\Column(length: 90 , unique: true)]
     private ?string $idUser = null;
 
     #[ORM\Column(length: 55)]
-    private ?string $name = null;
+    private ?string $firstname = null;
 
-    #[ORM\Column(length: 80,unique:true) ]
+    #[ORM\Column(length: 55)]
+    private ?string $lastname = null;
+
+    #[ORM\Column(length: 80, unique: true)]
     private ?string $email = null;
 
     #[ORM\Column(length: 90)]
@@ -37,7 +38,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $sexe = null;
 
     #[ORM\Column(type: "date", nullable: true)]
-    private ?string $dateBirth = null;
+    private ?\DateTimeInterface $dateBirth = null;
 
     #[ORM\Column]
     private ?\DateTimeImmutable $createAt = null;
@@ -48,7 +49,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToOne(mappedBy: 'User_idUser', cascade: ['persist', 'remove'])]
     private ?Artist $artist = null;
 
-    #[ORM\Column(type:"integer")]
+    #[ORM\Column(type: "integer")]
     private $loginAttempts;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
@@ -72,14 +73,26 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function getName(): ?string
+    public function getFirstname(): ?string
     {
-        return $this->name;
+        return $this->firstname;
     }
 
-    public function setName(string $name): static
+    public function setFirstname(string $firstname): static
     {
-        $this->name = $name;
+        $this->firstname = $firstname;
+
+        return $this;
+    }
+
+    public function getLastname(): ?string
+    {
+        return $this->lastname;
+    }
+
+    public function setLastname(string $lastname): static
+    {
+        $this->lastname = $lastname;
 
         return $this;
     }
@@ -120,7 +133,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function getSexe(): ? string
+    public function getSexe(): ?string
     {
         return $this->sexe;
     }
@@ -137,14 +150,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->dateBirth;
     }
 
-    public function setDateBirth(?string $dateBirth): static
+    public function setDateBirth(?\DateTimeInterface $dateBirth): static
     {
-        $this->dateBirth = substr($dateBirth,0,10);
+        $this->dateBirth = $dateBirth;
 
         return $this;
     }
-
-
 
     public function getCreateAt(): ?\DateTimeImmutable
     {
@@ -212,19 +223,19 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
 
-    public function getRoles(): array{
-
+    public function getRoles(): array
+    {
         return ['PUBLIC_ACCESS'];
     }
 
-    public function eraseCredentials(): void{
-
+    public function eraseCredentials(): void
+    {
+        // Les informations d'identification sont effacées automatiquement par Symfony
     }
 
-    public function getUserIdentifier(): string{
+    public function getUserIdentifier(): string
+    {
         return $this->getEmail();
-   
-
     }
 
     public function serializer()
@@ -232,7 +243,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return [
             'id' => $this->getId(),
             'idUser' => $this->getIdUser(),
-            'name' => $this->getName(),
+            'firstname' => $this->getFirstname(),
+            'lastname' => $this->getLastname(),
             'email' => $this->getEmail(),
             'tel' => $this->getTel(),
             'sexe' => $this->getSexe(),
@@ -240,4 +252,5 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
             'artist' => $this->getArtist() ? $this->getArtist()->serializer() : [],
         ];
     }
+
 }
