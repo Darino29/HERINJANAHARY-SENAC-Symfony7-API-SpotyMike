@@ -30,7 +30,7 @@ class UserController extends AbstractController
         $this->repository = $entityManager->getRepository(User::class);
     }
 
-    #[Route('/user', name: 'user_post', methods: 'POST')]
+    /*#[Route('/user', name: 'user_post', methods: 'POST')]
     public function create(Request $request, UserPasswordHasherInterface $passwordHash): JsonResponse
     {
     // Récupérer les données JSON du corps de la requête
@@ -68,7 +68,7 @@ class UserController extends AbstractController
     ]);
 }
 
-   
+   */
 
 
 
@@ -83,10 +83,9 @@ class UserController extends AbstractController
         ]);
     }
 
-
     #[Route('/user', name: 'update_user_profile', methods: ['POST'])]
-public function updateUserProfile(Request $request, EntityManagerInterface $entityManager, ValidatorInterface $validator, JWTTokenManagerInterface $JWTManager): JsonResponse
-{
+    public function updateUserProfile(Request $request, EntityManagerInterface $entityManager, ValidatorInterface $validator, JWTTokenManagerInterface $JWTManager, UserPasswordHasherInterface $passwordHasher): JsonResponse
+    {
     // Récupérer les données JSON du corps de la requête
     $data = json_decode($request->getContent(), true);
     
@@ -101,45 +100,61 @@ public function updateUserProfile(Request $request, EntityManagerInterface $enti
     // Extraire le JWT du format 'Bearer xxxx'
     $jwt = str_replace('Bearer ', '', $token);
 
-    // Vérifier si le token est valide et récupérer l'utilisateur associé
+    // Vérifier si le token est valide et récupérer le payload du JWT
     try {
-        $user = $JWTManager->parse($jwt)->getUser();
+        $token = $JWTManager->parse($jwt);
+        dump($token);
+        $payload = $token->getPayload();
+        
     } catch (JWTDecodeFailureException $e) {
         return $this->json(['error' => true, 'message' => 'Token invalide'], 401);
     }
+    
 
-    // Vérifier si l'utilisateur existe
-    if (!$user) {
+    // Vérifier si le payload contient les informations de l'utilisateur
+    if (!isset($payload['user'])) {
+        return $this->json(['error' => true, 'message' => 'Données utilisateur manquantes dans le token'], 401);
+    }
+
+    // Récupérer les informations de l'utilisateur depuis le payload
+    $user = $payload['user'];
+    
+    // Récupérer l'utilisateur depuis la base de données
+    $userRepository = $entityManager->getRepository(User::class);
+    $userEntity = $userRepository->findOneBy(['email' => $user['email']]); // Supposant que l'email est unique
+
+    // Mettre à jour les informations de l'utilisateur
+    if (!$userEntity) {
         return $this->json(['error' => true, 'message' => 'Utilisateur introuvable'], 404);
     }
 
-    // Mettre à jour les informations de l'utilisateur
+    // Vérifier et mettre à jour le nom
     if (isset($data['name'])) {
-        $user->setName($data['name']);
+        $userEntity->setName($data['name']);
     }
+
+    // Vérifier et mettre à jour le numéro de téléphone
     if (isset($data['tel'])) {
-        // Valider le format du numéro de téléphone
-        if (!preg_match('/^\d{10}$/', $data['tel'])) {
-            return $this->json(['error' => true, 'message' => 'Format de numéro de téléphone invalide'], 400);
-        }
-        // Vérifier si le numéro de téléphone est déjà utilisé par un autre utilisateur
-        $existingUser = $entityManager->getRepository(User::class)->findOneBy(['tel' => $data['tel']]);
-        if ($existingUser && $existingUser->getId() !== $user->getId()) {
-            return $this->json(['error' => true, 'message' => 'Numéro de téléphone déjà utilisé par un autre utilisateur'], 409);
-        }
-        $user->setTel($data['tel']);
+        $userEntity->setTel($data['tel']);
     }
+
+    // Vérifier et mettre à jour le sexe
     if (isset($data['sexe'])) {
-        // Vérifier si la valeur de sexe est valide
-        if (!in_array($data['sexe'], ['0', '1'])) {
-            return $this->json(['error' => true, 'message' => 'Valeur de sexe invalide'], 400);
-        }
-        $user->setSexe($data['sexe']);
+        $userEntity->setSexe($data['sexe']);
     }
-    // Ajoutez d'autres mises à jour pour les autres champs de l'utilisateur
+
+    // Vérifier et mettre à jour la date de naissance
+    if (isset($data['date_birth'])) {
+        $dateOfBirthString = $data['date_birth'];
+        $dateOfBirth = new \DateTime($dateOfBirthString);
+        $userEntity->setDateBirth($dateOfBirth);
+    }
+
+    // Mettre à jour la date de modification
+    $userEntity->setUpdateAt(new \DateTimeImmutable());
 
     // Valider les modifications avec le Validator
-    $errors = $validator->validate($user);
+    $errors = $validator->validate($userEntity);
 
     // Si des erreurs de validation sont présentes
     if (count($errors) > 0) {
@@ -161,22 +176,9 @@ public function updateUserProfile(Request $request, EntityManagerInterface $enti
     return $this->json([
         'error' => false,
         'message' => 'Profil mis à jour avec succès',
-        'user' => $user->serializer(), // Serializer le nouvel objet utilisateur
+        'user' => $userEntity->serializer(), // Serializer le nouvel objet utilisateur
     ]);
 }
-
-    #[Route('/user', name: 'user_get', methods: 'GET')]
-    public function read(): JsonResponse
-    {
-
-
-        $serializer = new Serializer([new ObjectNormalizer()]);
-        // $jsonContent = $serializer->serialize($person, 'json');
-        return $this->json([
-            'message' => 'Welcome to your new controller!',
-            'path' => 'src/Controller/UserController.php',
-        ]);
-    }
 
     #[Route('/user/all', name: 'user_get_all', methods: 'GET')]
     public function readAll(): JsonResponse
